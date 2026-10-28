@@ -7,6 +7,8 @@ import { Share } from '@capacitor/share';
 import { calcLine, calcTotals, para, birimAd, yaziyla } from './calc.js';
 import { tarihTR } from './gib.js';
 import { LOGO_PNG } from './logo.js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 // vfs_fonts.js bir modül değil, `this.pdfMake.vfs` atayan betik; kendi nesnemizde çalıştırıyoruz.
 const fontCtx = {};
@@ -120,7 +122,7 @@ export function faturaPdfTanimi(f, firma) {
               { text: ['Senaryo: ', { text: 'Temel / e-Arşiv', bold: true }] },
               { text: ['Tip: ', { text: 'Satış', bold: true }] },
               { text: ['Para birimi: ', { text: 'TRY', bold: true }] },
-              { text: `ETTN: ${f.id}`, fontSize: 6.5, color: '#64748b', margin: [0, 3, 0, 0] },
+              { text: `ETTN: ${f.ettn || f.id}`, fontSize: 6.5, color: '#64748b', margin: [0, 3, 0, 0] },
             ], fillColor: GRI, margin: [10, 8, 10, 8] }]] },
             layout: 'noBorders',
           },
@@ -190,15 +192,55 @@ function base64Al(tanim) {
   return new Promise((resolve) => pdfMake.createPdf(tanim).getBase64(resolve));
 }
 
-// Telefonda paylaşım penceresi açar (WhatsApp seçilir); tarayıcıda indirir.
-export async function pdfPaylas(tanim, dosyaAdi, mesaj) {
+async function base64Paylas(b64, dosyaAdi, mesaj) {
   if (Capacitor.isNativePlatform()) {
-    const b64 = await base64Al(tanim);
     const r = await Filesystem.writeFile({ path: dosyaAdi, data: b64, directory: Directory.Cache });
     await Share.share({ title: dosyaAdi, text: mesaj || '', files: [r.uri], dialogTitle: 'PDF paylaş' });
   } else {
-    pdfMake.createPdf(tanim).download(dosyaAdi);
+    const a = document.createElement('a');
+    a.href = 'data:application/pdf;base64,' + b64;
+    a.download = dosyaAdi;
+    a.click();
   }
+}
+
+// Telefonda paylaşım penceresi açar (WhatsApp seçilir); tarayıcıda indirir.
+export async function pdfPaylas(tanim, dosyaAdi, mesaj) {
+  await base64Paylas(await base64Al(tanim), dosyaAdi, mesaj);
+}
+
+// GİB'in resmi fatura HTML'sini A4 PDF'e çevirir (görüntü tabanlı).
+export async function htmlPdfBase64(html) {
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('sandbox', 'allow-same-origin'); // betik çalıştırma kapalı
+  iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;background:#fff';
+  document.body.appendChild(iframe);
+  try {
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    await new Promise((r) => setTimeout(r, 700)); // görseller yüklensin
+    const yukseklik = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight, 1123);
+    iframe.style.height = yukseklik + 'px';
+    const canvas = await html2canvas(doc.body, { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 794, windowHeight: yukseklik });
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const gen = pdf.internal.pageSize.getWidth();
+    const yuk = pdf.internal.pageSize.getHeight();
+    const resimYuk = (canvas.height * gen) / canvas.width;
+    const veri = canvas.toDataURL('image/jpeg', 0.92);
+    for (let i = 0; i * yuk < resimYuk - 1; i++) {
+      if (i > 0) pdf.addPage();
+      pdf.addImage(veri, 'JPEG', 0, -i * yuk, gen, resimYuk);
+    }
+    return pdf.output('datauristring').split(',')[1];
+  } finally {
+    iframe.remove();
+  }
+}
+
+export async function htmlPdfPaylas(html, dosyaAdi, mesaj) {
+  await base64Paylas(await htmlPdfBase64(html), dosyaAdi, mesaj);
 }
 
 export async function metinPaylas(metin, dosyaAdi, mime = 'text/csv') {

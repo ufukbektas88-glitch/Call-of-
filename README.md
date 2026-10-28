@@ -10,10 +10,11 @@ Tesisatçılar ve küçük esnaf için telefondan **GİB e-Arşiv Portal (ücret
 - Fatura geçmişi, arama/filtre, **GİB ile eşitleme** (eski faturaları çekme)
 - Tahsilat takibi (ödendi/bekliyor), ana sayfa özeti
 - **Fatura dökümü**: aylık/yıllık/özel tarih, KDV dökümü, PDF ve Excel (CSV) dışa aktarma
-- Test modu (GİB test portalı), yedek alma/yükleme
+- Demo modu (GİB'e bağlanmaz), yedek alma/yükleme
+- Onaylanan faturanın GİB'deki resmi görünümünden PDF üretip WhatsApp'tan gönderme
 
 ## APK nasıl alınır
-GitHub → **Actions** → son "APK Derle" çalışması → **Artifacts → ORCA-Fatura-apk** → `app-debug.apk` telefona kurulur
+GitHub → **Releases** → "OR-ÇA Fatura (son sürüm)" → `ORCA-Fatura.apk` telefona kurulur
 (Android'de "bilinmeyen kaynaklardan yükleme"ye izin vermek gerekir).
 
 ## Geliştirme

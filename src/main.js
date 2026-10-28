@@ -2,7 +2,7 @@ import { db, kaydet, upsert, sil, yeniId, yedekAl, yedekYukle } from './store.js
 import { calcLine, calcTotals, para, BIRIMLER, KDV_ORANLARI, r2 } from './calc.js';
 import { Gib, gibFaturaGovdesi, tarihTR, uuid } from './gib.js';
 import { LOGO_PNG } from './logo.js';
-import { faturaPdfTanimi, raporPdfTanimi, pdfPaylas, metinPaylas } from './pdf.js';
+import { faturaPdfTanimi, raporPdfTanimi, pdfPaylas, htmlPdfPaylas, metinPaylas } from './pdf.js';
 
 const app = document.getElementById('app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -276,9 +276,9 @@ async function faturaGonder(onayla) {
       upsert('musteriler', { id: yeniId(), ...f.musteri });
     }
     const g = getGib();
-    await g.taslakOlustur(gibFaturaGovdesi(f));
+    const satir = await g.taslakOlustur(gibFaturaGovdesi(f), new Date(f.tarihObj));
     const t = calcTotals(f.satirlar, f.kdvDahil);
-    const kayit = { ...f, toplam: { matrah: t.matrah, kdv: t.kdv, toplam: t.toplam }, durum: 'taslak', odendi: false, olusturma: new Date().toISOString() };
+    const kayit = { ...f, ettn: satir.ettn, belgeNumarasi: satir.belgeNumarasi || '', toplam: { matrah: t.matrah, kdv: t.kdv, toplam: t.toplam }, durum: 'taslak', odendi: false, olusturma: new Date().toISOString() };
     delete kayit._firma;
     upsert('faturalar', kayit);
     taslak = null;
@@ -291,20 +291,42 @@ async function faturaGonder(onayla) {
   }
 }
 
+// Müşteriye gönderilecek PDF: onaylıysa GİB'in resmi görünümünden, olmazsa kendi şablonumuzdan.
+async function faturaPdfGonder(f) {
+  const t = toplamAl(f);
+  const dosya = `Fatura-${f.belgeNumarasi || (f.ettn || f.id).slice(0, 8)}.pdf`;
+  const mesaj = `Merhaba, ${para(t.toplam)} tutarındaki faturanız ektedir. Teşekkürler.`;
+  if (f.durum === 'onaylandi' && (f.ettn || f.id)) {
+    const w = bekle('Onaylı fatura GİB\'den alınıyor…');
+    try {
+      const html = await getGib().htmlGetir(f.ettn || f.id, true);
+      if (html && html.length > 200) {
+        await htmlPdfPaylas(html, dosya, mesaj);
+        w.remove();
+        return;
+      }
+    } catch (e) {
+      toast('GİB görünümü alınamadı, özet PDF hazırlanıyor', 3500);
+    }
+    w.remove();
+  }
+  if (!(f.satirlar && f.satirlar.length)) return toast('Bu faturanın kalem bilgisi yok.');
+  await pdfPaylas(faturaPdfTanimi(f, db().ayar.firma), dosya, mesaj);
+}
+
 // SMS onayı: GİB, kayıtlı telefona kod gönderir.
 async function onayAkisi(id) {
   const f = db().faturalar.find((x) => x.id === id);
+  const ettn = f.ettn || f.id;
   const g = getGib();
   const w = bekle('SMS kodu isteniyor…');
-  let oid, satir;
+  let oid, satir, tel;
   try {
-    const bugun = new Date();
-    const liste = await g.listele(new Date(bugun.getTime() - 40 * 86400000), bugun);
-    satir = liste.find((x) => x.ettn === id);
-    if (!satir) throw new Error('Taslak GİB listesinde bulunamadı. Biraz sonra tekrar deneyin.');
-    f.belgeNumarasi = satir.belgeNumarasi;
+    satir = await g.satirBul(ettn, new Date(f.tarihObj));
+    if (!satir) throw new Error('Taslak GİB listesinde bulunamadı. Faturalar → GİB ile eşitle deneyin.');
+    f.belgeNumarasi = satir.belgeNumarasi || f.belgeNumarasi;
     upsert('faturalar', f);
-    oid = await g.smsGonder();
+    ({ oid, tel } = await g.smsGonder());
   } catch (e) {
     w.remove();
     toast('⚠ ' + e.message, 5000);
@@ -313,7 +335,7 @@ async function onayAkisi(id) {
   }
   w.remove();
   const m = modal(`<h2 style="margin-top:0">SMS onay kodu</h2>
-    <p class="mut">GİB'e kayıtlı telefonunuza gelen kodu girin.${db().ayar.mode === 'test' ? ' (Demo modunda herhangi bir kod girebilirsiniz.)' : ''}</p>
+    <p class="mut">GİB'e kayıtlı telefonunuza (${esc(tel)}) gelen kodu girin.${db().ayar.mode === 'test' ? ' (Demo modunda herhangi bir kod girebilirsiniz.)' : ''}</p>
     <input id="smsKod" inputmode="numeric" autocomplete="one-time-code" style="font-size:24px;text-align:center;letter-spacing:6px" />
     <button class="big" id="smsOk" style="margin-top:12px">Onayla</button>
     <button class="ghost" id="smsIptal" style="width:100%;margin-top:6px">Sonra onaylarım (taslak kalsın)</button>`);
@@ -325,16 +347,32 @@ async function onayAkisi(id) {
     try {
       await g.onayla(oid, kod, [satir]);
       f.durum = 'onaylandi';
+      try {
+        const yeni = await g.satirBul(ettn, new Date(f.tarihObj));
+        if (yeni && yeni.belgeNumarasi) f.belgeNumarasi = yeni.belgeNumarasi;
+      } catch {}
       upsert('faturalar', f);
       m.remove();
-      toast('✅ Fatura onaylandı');
-      location.hash = '#/fatura/' + id;
+      onayliModal(f);
     } catch (e) {
       $('#smsOk', m).disabled = false;
       toast('⚠ ' + e.message, 5000);
     }
   };
   setTimeout(() => $('#smsKod', m) && $('#smsKod', m).focus(), 100);
+}
+
+function onayliModal(f) {
+  const m = modal(`<h2 style="margin-top:0">✅ Fatura onaylandı</h2>
+    <p>Fatura No: <b>${esc(f.belgeNumarasi || '—')}</b><br><span class="mut">${esc(musteriAdi(f.musteri))} · ${para(toplamAl(f).toplam)}</span></p>
+    <button class="big" id="wpHemen">💬 Müşteriye WhatsApp'tan gönder (PDF)</button>
+    <button class="ghost" id="wpKapat" style="width:100%;margin-top:6px">Şimdi değil</button>`);
+  $('#wpKapat', m).onclick = () => { m.remove(); location.hash = '#/fatura/' + f.id; };
+  $('#wpHemen', m).onclick = async () => {
+    try { await faturaPdfGonder(f); } catch (e) { toast('⚠ ' + e.message, 4000); }
+    m.remove();
+    location.hash = '#/fatura/' + f.id;
+  };
 }
 
 // ================= FATURA LİSTESİ =================
@@ -373,12 +411,12 @@ async function esitle() {
       const satirlar = await g.listeleAralik(bas, bit);
       let yeni = 0, guncel = 0;
       for (const s of satirlar) {
-        const var_ = db().faturalar.find((x) => x.id === s.ettn);
+        const var_ = db().faturalar.find((x) => x.ettn === s.ettn || x.id === s.ettn);
         const durum = gibDurum(s.onayDurumu);
         if (var_) { var_.belgeNumarasi = s.belgeNumarasi || var_.belgeNumarasi; var_.durum = durum; guncel++; }
         else {
           const unvan = s.aliciUnvanAdSoyad || '';
-          db().faturalar.push({ id: s.ettn, belgeNumarasi: s.belgeNumarasi, tarihObj: gibTarihParse(s.belgeTarihi), musteri: { unvan, vkn: s.aliciVknTckn && s.aliciVknTckn !== '11111111111' ? s.aliciVknTckn : '' }, satirlar: [], durum, odendi: true, kaynak: 'gib' });
+          db().faturalar.push({ id: s.ettn, ettn: s.ettn, belgeNumarasi: s.belgeNumarasi, tarihObj: gibTarihParse(s.belgeTarihi), musteri: { unvan, vkn: s.aliciVknTckn && s.aliciVknTckn !== '11111111111' ? s.aliciVknTckn : '' }, satirlar: [], durum, odendi: true, kaynak: 'gib' });
           yeni++;
         }
       }
@@ -408,18 +446,14 @@ rota(/^\/fatura\/(.+)$/, (id) => {
       ${tam ? f.satirlar.map((l) => `<div class="item"><div>${esc(l.ad)}<div class="mut">${l.miktar} × ${l.birimFiyat}₺ · KDV %${l.kdvOrani}</div></div><div class="r">${para(calcLine(l, f.kdvDahil).net)}</div></div>`).join('') : '<p class="mut">Bu fatura GİB\'den eşitlendi; kalem detayı uygulamada yok.</p>'}
       ${tam ? `<div class="sum"><span>KDV</span><span>${para(t.kdv)}</span></div><div class="sum t"><span>Toplam</span><span>${para(t.toplam)}</span></div>` : ''}
     </div>
-    ${tam ? `<button class="big" id="wp">💬 PDF'i WhatsApp ile gönder</button>` : ''}
+    ${tam || f.durum === 'onaylandi' ? `<button class="big" id="wp">💬 ${f.durum === 'onaylandi' ? 'Onaylı faturayı WhatsApp ile gönder' : 'PDF taslağını WhatsApp ile gönder'}</button>` : ''}
     <div style="height:10px"></div>
     ${f.durum === 'taslak' ? `<button class="big" id="onayla" style="background:var(--ok)">✅ Şimdi onayla (SMS)</button><div style="height:10px"></div>` : ''}
     ${f.durum === 'onaylandi' && tam ? `<button class="sec big" id="odeme">${f.odendi ? '↩ Tahsilatı geri al' : '💰 Tahsil edildi olarak işaretle'}</button><div style="height:10px"></div>` : ''}
     <div class="row">${tam ? '<button class="sec" id="kopya">⧉ Kopyala</button>' : ''}${f.durum === 'taslak' ? '<button class="bad" id="sil">🗑 Taslağı sil</button>' : ''}${f.kaynak === 'gib' || f.durum === 'iptal' ? '<button class="bad" id="yerelSil">Listeden kaldır</button>' : ''}</div>`
   );
   const w = $('#wp');
-  if (w) w.onclick = async () => {
-    try {
-      await pdfPaylas(faturaPdfTanimi(f, db().ayar.firma), `Fatura-${f.belgeNumarasi || f.id.slice(0, 8)}.pdf`, `Merhaba, ${para(t.toplam)} tutarındaki faturanız ektedir. Teşekkürler.`);
-    } catch (e) { toast('⚠ ' + e.message, 4000); }
-  };
+  if (w) w.onclick = async () => { try { await faturaPdfGonder(f); } catch (e) { toast('⚠ ' + e.message, 4000); } };
   if ($('#onayla')) $('#onayla').onclick = () => onayAkisi(f.id);
   if ($('#odeme')) $('#odeme').onclick = () => { f.odendi = !f.odendi; upsert('faturalar', f); yonlendir(); };
   if ($('#kopya')) $('#kopya').onclick = () => {
@@ -430,7 +464,9 @@ rota(/^\/fatura\/(.+)$/, (id) => {
     if (!confirm('Taslak GİB\'den silinsin mi?')) return;
     const w2 = bekle('Siliniyor…');
     try {
-      await getGib().sil({ ettn: f.id, belgeNumarasi: f.belgeNumarasi || '', onayDurumu: 'Onaylanmadı' });
+      const g2 = getGib();
+      const satir = await g2.satirBul(f.ettn || f.id, new Date(f.tarihObj));
+      if (satir) await g2.sil(satir);
       sil('faturalar', f.id);
       w2.remove();
       location.hash = '#/faturalar';
