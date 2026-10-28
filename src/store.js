@@ -7,7 +7,7 @@ const varsayilan = () => ({
     user: '',
     pass: '',
     hatirla: true,
-    firma: { unvan: 'CEMİL DUR - ORCA TESİSAT', vkn: '45064396300', vergiDairesi: '', adres: 'İçerenköy Mahallesi Karslı Ahmet Caddesi Meskenler Girişi Sokak No: 2 Dükkan 2', il: 'İstanbul', ilce: 'Ataşehir', tel: '', eposta: '' },
+    firma: { unvan: 'CEMİL DUR - ORCA TESİSAT', vkn: '45064396300', vergiDairesi: 'Kozyatağı', adres: 'İçerenköy Mahallesi Karslı Ahmet Caddesi Meskenler Girişi Sokak No: 2 Dükkan 2', il: 'İstanbul', ilce: 'Ataşehir', tel: '0535 348 79 94', eposta: '' },
     varsayilanKdv: 20,
     kdvDahil: false,
     notSablonu: '',
