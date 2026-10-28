@@ -77,9 +77,16 @@ function demoCall(cmd, jp) {
   return { data: {} };
 }
 
+const TOKEN_KEY = 'orca.gibtoken.';
+const tokenOku = (mode) => { try { return localStorage.getItem(TOKEN_KEY + mode) || ''; } catch { return ''; } };
+const tokenYaz = (mode, t) => { try { t ? localStorage.setItem(TOKEN_KEY + mode, t) : localStorage.removeItem(TOKEN_KEY + mode); } catch {} };
+
 function hataMetni(r) {
   const m = r.messages && r.messages[0];
   const metin = (typeof m === 'string' ? m : m && m.text) || 'GİB işlemi reddetti.';
+  if (/aynı anda birden fazla giriş/i.test(metin)) {
+    return 'GİB hesabınızda başka bir oturum açık (tarayıcıda veya başka telefonda). earsivportal.efatura.gov.tr\'ye girip sağ üstten "Güvenli Çıkış" yapın, sonra tekrar deneyin. Oturum bir süre sonra kendiliğinden de düşer.';
+  }
   if (/e-Ar[şs]iv Portal Fatura.*kesemez/i.test(metin)) {
     return metin + ' → Giriş yaptığınız GİB hesabı bu numaraya ait. Ayarlar\'daki kullanıcı kodunun SİZİN hesabınıza ait olduğunu kontrol edin (Bağlantıyı dene → hesap adını gösterir). Hesap doğruysa bu mükellef e-Fatura mükellefidir ve e-Arşiv portalından fatura kesemez.';
   }
@@ -119,28 +126,44 @@ export class Gib {
     }
   }
 
+  // Önceki oturum açık kalmışsa (uygulama kapanmış olabilir) önce onu kapatır.
+  async eskiOturumuKapat() {
+    const eski = tokenOku(this.mode);
+    if (!eski) return;
+    for (const komut of ['anologin', 'logout']) {
+      try { await this._post('/earsiv-services/assos-login', { assoscmd: komut, rtype: 'json', token: eski }); } catch {}
+    }
+    tokenYaz(this.mode, '');
+  }
+
   async login() {
     if (this.mode === 'test') { this.token = 'DEMO'; return true; }
     const u = this.user, p = this.pass;
     const kok = base(this.mode);
     const sayfaBaslik = { Referer: kok + '/intragiris.html', Origin: kok, 'X-Requested-With': 'XMLHttpRequest' };
     this.tumTani = '';
+    await this.eskiOturumuKapat();
     let ilkHata = '';
     // GİB'in kendi giriş sayfası assoscmd olarak "anologin" gönderir.
     for (const ek of [{}, sayfaBaslik]) {
       const r = await this._post('/earsiv-services/assos-login', { assoscmd: 'anologin', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, ek);
-      if (r.token) { this.token = r.token; return true; }
+      if (r.token) { this.token = r.token; tokenYaz(this.mode, r.token); return true; }
       if (!ilkHata) ilkHata = r.error && r.error !== '0' ? hataMetni(r) : 'Giriş başarısız. Kullanıcı adı/şifre kontrol edin.';
+      if (/başka bir oturum/i.test(ilkHata)) break;
     }
     throw new Error(ilkHata);
   }
 
+  // "Güvenli Çıkış": her iş bitince çağrılır ki GİB'de oturum açık kalıp tarayıcı girişini engellemesin.
   async logout() {
-    if (!this.token || this.mode === 'test') { this.token = null; return; }
-    try {
-      await this._post('/earsiv-services/assos-login', { assoscmd: 'anologin', rtype: 'json', token: this.token });
-    } catch {}
+    const t = this.token;
     this.token = null;
+    if (this.mode === 'test') return;
+    tokenYaz(this.mode, '');
+    if (!t) return;
+    for (const komut of ['anologin', 'logout']) {
+      try { await this._post('/earsiv-services/assos-login', { assoscmd: komut, rtype: 'json', token: t }); } catch {}
+    }
   }
 
   // Tam cevabı döner ({data, oid, ...}); hata varsa fırlatır.

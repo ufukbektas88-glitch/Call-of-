@@ -41,6 +41,11 @@ function getGib() {
   return gib;
 }
 
+// İş bitince GİB'den güvenli çıkış (tarayıcı girişini engellemesin)
+async function kapat() {
+  try { if (gib) await gib.logout(); } catch {}
+}
+
 // ---------- yardımcılar ----------
 const ayAdi = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const gunKisa = (iso) => (iso ? tarihTR(new Date(iso)) : '-');
@@ -289,9 +294,10 @@ async function faturaGonder(onayla) {
     taslak = null;
     w.remove();
     if (onayla) await onayAkisi(kayit.id);
-    else { toast('Taslak GİB\'e kaydedildi'); location.hash = '#/fatura/' + kayit.id; }
+    else { await kapat(); toast('Taslak GİB\'e kaydedildi'); location.hash = '#/fatura/' + kayit.id; }
   } catch (e) {
     w.remove();
+    await kapat();
     toast('⚠ ' + e.message, 5000);
   }
 }
@@ -305,12 +311,14 @@ async function faturaPdfGonder(f) {
     const w = bekle('Onaylı fatura GİB\'den alınıyor…');
     try {
       const html = await getGib().htmlGetir(f.ettn || f.id, true);
+      await kapat();
       if (html && html.length > 200) {
         await htmlPdfPaylas(html, dosya, mesaj);
         w.remove();
         return;
       }
     } catch (e) {
+      await kapat();
       toast('GİB görünümü alınamadı, özet PDF hazırlanıyor', 3500);
     }
     w.remove();
@@ -334,6 +342,7 @@ async function onayAkisi(id) {
     ({ oid, tel } = await g.smsGonder());
   } catch (e) {
     w.remove();
+    await kapat();
     toast('⚠ ' + e.message, 5000);
     location.hash = '#/fatura/' + id;
     return;
@@ -344,7 +353,7 @@ async function onayAkisi(id) {
     <input id="smsKod" inputmode="numeric" autocomplete="one-time-code" style="font-size:24px;text-align:center;letter-spacing:6px" />
     <button class="big" id="smsOk" style="margin-top:12px">Onayla</button>
     <button class="ghost" id="smsIptal" style="width:100%;margin-top:6px">Sonra onaylarım (taslak kalsın)</button>`);
-  $('#smsIptal', m).onclick = () => { m.remove(); location.hash = '#/fatura/' + id; };
+  $('#smsIptal', m).onclick = () => { m.remove(); kapat(); location.hash = '#/fatura/' + id; };
   $('#smsOk', m).onclick = async () => {
     const kod = $('#smsKod', m).value.trim();
     if (!kod) return;
@@ -358,6 +367,7 @@ async function onayAkisi(id) {
       } catch {}
       upsert('faturalar', f);
       m.remove();
+      await kapat();
       onayliModal(f);
     } catch (e) {
       $('#smsOk', m).disabled = false;
@@ -427,9 +437,10 @@ async function esitle() {
       }
       kaydet();
       w.remove();
+      await kapat();
       toast(`${yeni} yeni, ${guncel} güncellendi`);
       yonlendir();
-    } catch (e) { w.remove(); toast('⚠ ' + e.message, 5000); }
+    } catch (e) { w.remove(); await kapat(); toast('⚠ ' + e.message, 5000); }
   }));
 }
 
@@ -472,10 +483,11 @@ rota(/^\/fatura\/(.+)$/, (id) => {
       const g2 = getGib();
       const satir = await g2.satirBul(f.ettn || f.id, new Date(f.tarihObj));
       if (satir) await g2.sil(satir);
+      await kapat();
       sil('faturalar', f.id);
       w2.remove();
       location.hash = '#/faturalar';
-    } catch (e) { w2.remove(); toast('⚠ ' + e.message, 5000); }
+    } catch (e) { w2.remove(); await kapat(); toast('⚠ ' + e.message, 5000); }
   };
   if ($('#yerelSil')) $('#yerelSil').onclick = () => { if (confirm('Sadece uygulamadaki kayıt silinir.')) { sil('faturalar', f.id); location.hash = '#/faturalar'; } };
 });
@@ -663,8 +675,10 @@ rota(/^\/ayarlar$/, () => {
         ${farkli ? `<div class="warn">⚠ Bu hesap, Ayarlar'daki işletme numaranızdan (${esc(a.firma.vkn)}) farklı. Yanlış hesapla girmiş olabilirsiniz. Kullanıcı kodunu kontrol edin.</div>` : ''}
         <button class="big" id="m0k" style="margin-top:12px">Tamam</button>`);
       $('#m0k', m0).onclick = () => m0.remove();
+      await kapat();
     } catch (e) {
       w.remove();
+      await kapat();
       const tani = (g && (g.tumTani || g.sonTani)) || '';
       const m = modal(`<h2 style="margin-top:0">⚠ Bağlantı kurulamadı</h2><p>${esc(e.message)}</p>
         ${tani ? `<label>Teknik ayrıntı (şifre içermez)</label><textarea rows="8" readonly style="font-size:12px">${esc(tani)}</textarea>` : ''}
