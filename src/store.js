@@ -7,7 +7,7 @@ const varsayilan = () => ({
     user: '',
     pass: '',
     hatirla: true,
-    firma: { unvan: '', vkn: '', vergiDairesi: '', adres: '', il: '', ilce: '', tel: '', eposta: '' },
+    firma: { unvan: 'OR-ÇA Su Tesisatı', vkn: '', vergiDairesi: '', adres: '', il: '', ilce: '', tel: '', eposta: '' },
     varsayilanKdv: 20,
     kdvDahil: false,
     notSablonu: '',

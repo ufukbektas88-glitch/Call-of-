@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fb6ea"/><stop offset="1" stop-color="#0b4fa3"/></linearGradient>
+    <clipPath id="disc"><circle cx="256" cy="256" r="236"/></clipPath>
+    <clipPath id="drop"><path id="dp" d="M256 64 C256 64 118 212 118 304 a138 138 0 0 0 276 0 C394 212 256 64 256 64Z"/></clipPath>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="#0a2540"/>
+  <circle cx="256" cy="256" r="236" fill="url(#sea)"/>
+  <g clip-path="url(#disc)">
+    <circle cx="256" cy="256" r="236" fill="none"/>
+    <path d="M0 400 C70 370 130 372 190 400 S310 430 370 400 S460 372 512 392 V512 H0Z" fill="#0a2540" opacity=".35"/>
+  </g>
+  <!-- damla -->
+  <path d="M256 64 C256 64 118 212 118 304 a138 138 0 0 0 276 0 C394 212 256 64 256 64Z" fill="#ffffff"/>
+  <g clip-path="url(#drop)">
+    <path d="M100 330 C150 304 200 304 256 330 S362 356 412 330 V460 H100Z" fill="#2fb6ea"/>
+    <path d="M100 372 C150 346 200 346 256 372 S362 398 412 372 V460 H100Z" fill="#0b64b8"/>
+  </g>
+  <!-- vana çarkı -->
+  <g fill="none" stroke="#0a2540" stroke-linecap="round">
+    <circle cx="256" cy="250" r="50" stroke-width="14"/>
+    <path d="M256 200 V300 M206 250 H306 M221 215 L291 285 M291 215 L221 285" stroke-width="9"/>
+  </g>
+  <circle cx="256" cy="250" r="15" fill="#0a2540"/>
+  <rect x="226" y="304" width="60" height="16" rx="4" fill="#0a2540"/>
+  <!-- parlama -->
+  <path d="M168 258 C172 228 190 200 214 176" fill="none" stroke="#2fb6ea" stroke-width="9" stroke-linecap="round" opacity=".7"/>
+  <circle cx="256" cy="256" r="244" fill="none" stroke="#ffffff" stroke-width="6" opacity=".9"/>
+</svg>

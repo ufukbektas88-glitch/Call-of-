@@ -1,4 +1,4 @@
-# 🔧 Usta Fatura
+# OR-ÇA Su Tesisatı Fatura
 
 Tesisatçılar ve küçük esnaf için telefondan **GİB e-Arşiv Portal (ücretsiz)** üzerinden fatura kesme uygulaması.
 
@@ -13,7 +13,7 @@ Tesisatçılar ve küçük esnaf için telefondan **GİB e-Arşiv Portal (ücret
 - Test modu (GİB test portalı), yedek alma/yükleme
 
 ## APK nasıl alınır
-GitHub → **Actions** → son "APK Derle" çalışması → **Artifacts → UstaFatura-apk** → `app-debug.apk` telefona kurulur
+GitHub → **Actions** → son "APK Derle" çalışması → **Artifacts → ORCA-Fatura-apk** → `app-debug.apk` telefona kurulur
 (Android'de "bilinmeyen kaynaklardan yükleme"ye izin vermek gerekir).
 
 ## Geliştirme

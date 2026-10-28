@@ -1,6 +1,6 @@
 {
   "appId": "com.ustafatura.app",
-  "appName": "Usta Fatura",
+  "appName": "OR-ÇA Su Tesisatı Fatura",
   "webDir": "dist",
   "server": { "androidScheme": "https" },
   "plugins": { "CapacitorHttp": { "enabled": true } }

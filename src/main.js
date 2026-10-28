@@ -1,6 +1,7 @@
 import { db, kaydet, upsert, sil, yeniId, yedekAl, yedekYukle } from './store.js';
 import { calcLine, calcTotals, para, BIRIMLER, KDV_ORANLARI, r2 } from './calc.js';
 import { Gib, gibFaturaGovdesi, tarihTR, uuid } from './gib.js';
+import { LOGO_PNG } from './logo.js';
 import { faturaPdfTanimi, raporPdfTanimi, pdfPaylas, metinPaylas } from './pdf.js';
 
 const app = document.getElementById('app');
@@ -102,7 +103,7 @@ rota(/^\/$/, () => {
   const ilkKurulum = d.ayar.mode === 'prod' && (!d.ayar.user || !d.ayar.pass);
   sayfa(
     '#/',
-    `<h1>🔧 ${esc(d.ayar.firma.unvan || 'Usta Fatura')}</h1>
+    `<div class="brand"><img src="${LOGO_PNG}" alt=""><div><b>${esc((d.ayar.firma.unvan || 'OR-ÇA Su Tesisatı').toLocaleUpperCase('tr'))}</b><span>FATURA</span></div></div>
     ${ilkKurulum ? `<div class="warn" style="margin-bottom:12px">Başlamak için <a href="#/ayarlar">Ayarlar</a>'dan GİB e-Arşiv kullanıcı adı/şifrenizi ve işletme bilgilerinizi girin. Denemek için "Test modu"nu açabilirsiniz.</div>` : ''}
     ${d.ayar.mode === 'test' ? `<div class="warn" style="margin-bottom:12px">🧪 TEST MODU açık — kesilen faturalar gerçek değildir.</div>` : ''}
     <div class="grid2">
