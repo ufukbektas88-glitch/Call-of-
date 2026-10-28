@@ -104,8 +104,8 @@ rota(/^\/$/, () => {
   sayfa(
     '#/',
     `<div class="brand"><img src="${LOGO_PNG}" alt=""><div><b>${esc((d.ayar.firma.unvan || 'OR-ÇA Su Tesisatı').toLocaleUpperCase('tr'))}</b><span>FATURA</span></div></div>
-    ${ilkKurulum ? `<div class="warn" style="margin-bottom:12px">Başlamak için <a href="#/ayarlar">Ayarlar</a>'dan GİB e-Arşiv kullanıcı adı/şifrenizi ve işletme bilgilerinizi girin. Denemek için "Test modu"nu açabilirsiniz.</div>` : ''}
-    ${d.ayar.mode === 'test' ? `<div class="warn" style="margin-bottom:12px">🧪 TEST MODU açık — kesilen faturalar gerçek değildir.</div>` : ''}
+    ${ilkKurulum ? `<div class="warn" style="margin-bottom:12px">Başlamak için <a href="#/ayarlar">Ayarlar</a>'dan GİB e-Arşiv kullanıcı adı/şifrenizi ve işletme bilgilerinizi girin. Denemek için "Demo" modunu açabilirsiniz.</div>` : ''}
+    ${d.ayar.mode === 'test' ? `<div class="warn" style="margin-bottom:12px">🧪 DEMO MODU açık — GİB'e bağlı değil, faturalar gerçek değildir. Gerçek fatura için Ayarlar'dan "Gerçek"e geçin.</div>` : ''}
     <div class="grid2">
       <div class="card"><div class="mut">${ayAdi[simdi.getMonth()]} cirosu</div><div class="stat">${para(ciro)}</div><div class="mut">${buAy.length} fatura</div></div>
       <div class="card"><div class="mut">Tahsil edilmemiş</div><div class="stat" style="color:var(--warn)">${para(bekTutar)}</div><div class="mut">${bekleyen.length} fatura</div></div>
@@ -313,7 +313,7 @@ async function onayAkisi(id) {
   }
   w.remove();
   const m = modal(`<h2 style="margin-top:0">SMS onay kodu</h2>
-    <p class="mut">GİB'e kayıtlı telefonunuza gelen kodu girin.${db().ayar.mode === 'test' ? ' (Test modunda herhangi bir kod girebilirsiniz.)' : ''}</p>
+    <p class="mut">GİB'e kayıtlı telefonunuza gelen kodu girin.${db().ayar.mode === 'test' ? ' (Demo modunda herhangi bir kod girebilirsiniz.)' : ''}</p>
     <input id="smsKod" inputmode="numeric" autocomplete="one-time-code" style="font-size:24px;text-align:center;letter-spacing:6px" />
     <button class="big" id="smsOk" style="margin-top:12px">Onayla</button>
     <button class="ghost" id="smsIptal" style="width:100%;margin-top:6px">Sonra onaylarım (taslak kalsın)</button>`);
@@ -583,8 +583,8 @@ rota(/^\/ayarlar$/, () => {
   const inp = (k, t, ek = '') => `<label>${t}</label><input data-fr="${k}" value="${esc(fr[k])}" ${ek}/>`;
   sayfa('#/daha', `<button class="ghost" onclick="history.back()">← Geri</button><h1>Ayarlar</h1>
     <div class="card"><h2 style="margin-top:0">GİB e-Arşiv Portal</h2>
-      <div class="seg"><button data-mode="prod" class="${a.mode === 'prod' ? 'on' : ''}">Gerçek</button><button data-mode="test" class="${a.mode === 'test' ? 'on' : ''}">🧪 Test</button></div>
-      ${a.mode === 'prod' ? `<label>Kullanıcı adı</label><input id="gu" value="${esc(a.user)}" autocomplete="off" /><label>Şifre</label><div class="row"><input id="gp" type="password" value="${esc(a.pass)}" autocomplete="off" autocapitalize="off" spellcheck="false" /><button class="sec auto" id="goz" type="button">👁</button></div>` : '<p class="mut">Test modunda kullanıcı adı gerekmez; faturalar gerçek değildir.</p>'}
+      <div class="seg"><button data-mode="prod" class="${a.mode === 'prod' ? 'on' : ''}">Gerçek</button><button data-mode="test" class="${a.mode === 'test' ? 'on' : ''}">🧪 Demo</button></div>
+      ${a.mode === 'prod' ? `<label>Kullanıcı adı</label><input id="gu" value="${esc(a.user)}" autocomplete="off" /><label>Şifre</label><div class="row"><input id="gp" type="password" value="${esc(a.pass)}" autocomplete="off" autocapitalize="off" spellcheck="false" /><button class="sec auto" id="goz" type="button">👁</button></div>` : '<p class="mut">Demo modu GİB bağlantısı kurmaz; uygulamayı denemek içindir. Kesilen faturalar gerçek DEĞİLDİR.</p>'}
       <p class="mut">Bilgiler yalnızca bu telefonda saklanır, GİB dışında hiçbir yere gönderilmez.</p>
       <button class="sec" id="dene" style="width:100%">🔌 Bağlantıyı dene</button></div>
     <div class="card"><h2 style="margin-top:0">İşletme bilgileriniz (faturada görünür)</h2>

@@ -23,6 +23,43 @@ export const tarihTR = (d = new Date()) =>
 export const saatTR = (d = new Date()) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 
+// GİB test portalı kapandığı için "test" modu telefonda çalışan yerel bir simülasyondur.
+const DEMO_KEY = 'orca.demo.v1';
+const demoOku = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY)) || { sayac: 0, satirlar: [] }; } catch { return { sayac: 0, satirlar: [] }; } };
+const demoYaz = (d) => { try { localStorage.setItem(DEMO_KEY, JSON.stringify(d)); } catch {} };
+function demoCall(cmd, jp) {
+  const d = demoOku();
+  if (cmd === 'EARSIV_PORTAL_FATURA_OLUSTUR') {
+    d.sayac++;
+    const t = new Date();
+    d.satirlar.push({
+      ettn: jp.faturaUuid,
+      belgeNumarasi: `DEMO${t.getFullYear()}${String(d.sayac).padStart(9, '0')}`,
+      belgeTarihi: jp.faturaTarihi,
+      aliciUnvanAdSoyad: jp.aliciUnvan || `${jp.aliciAdi} ${jp.aliciSoyadi}`.trim(),
+      aliciVknTckn: jp.vknTckn,
+      onayDurumu: 'Onaylanmadı',
+    });
+    demoYaz(d);
+    return 'DEMO: taslak oluşturuldu';
+  }
+  if (cmd === 'EARSIV_PORTAL_TASLAKLARI_GETIR') return d.satirlar;
+  if (cmd === 'EARSIV_PORTAL_SMSSIFRE_GONDER') return { oid: 'DEMO-OID' };
+  if (cmd === 'EARSIV_PORTAL_SMSSIFRE_DOGRULA') {
+    const ettnler = (jp.DATA || []).map((x) => x.ettn);
+    d.satirlar.forEach((s) => ettnler.includes(s.ettn) && (s.onayDurumu = 'Onaylandı'));
+    demoYaz(d);
+    return { sonuc: '1', msg: 'DEMO onaylandı' };
+  }
+  if (cmd === 'EARSIV_PORTAL_FATURA_SIL') {
+    const ettnler = (jp.silinecekler || []).map((x) => x.ettn);
+    d.satirlar = d.satirlar.filter((s) => !ettnler.includes(s.ettn));
+    demoYaz(d);
+    return 'DEMO: silindi';
+  }
+  return {};
+}
+
 export class Gib {
   constructor({ mode = 'prod', user = '', pass = '' } = {}) {
     this.mode = mode;
@@ -55,10 +92,8 @@ export class Gib {
   }
 
   async login() {
-    const test = this.mode === 'test';
-    const params = test
-      ? { assoscmd: 'anologin', rtype: 'json' }
-      : { assoscmd: 'login', userid: this.user, sifre: this.pass, sifre2: this.pass, parola: '1', rtype: 'json' };
+    if (this.mode === 'test') { this.token = 'DEMO'; return true; }
+    const params = { assoscmd: 'login', userid: this.user, sifre: this.pass, sifre2: this.pass, parola: '1', rtype: 'json' };
     const r = await this._post('/earsiv-services/assos-login', params);
     if (!r.token) {
       const msg = (r.messages && r.messages[0] && r.messages[0].text) || r.error || 'Giriş başarısız. Kullanıcı adı/şifre kontrol edin.';
@@ -69,7 +104,7 @@ export class Gib {
   }
 
   async logout() {
-    if (!this.token) return;
+    if (!this.token || this.mode === 'test') { this.token = null; return; }
     try {
       await this._post('/earsiv-services/assos-login', { assoscmd: 'logout', rtype: 'json', token: this.token });
     } catch {}
@@ -77,6 +112,7 @@ export class Gib {
   }
 
   async call(cmd, pageName, jp, retried = false) {
+    if (this.mode === 'test') return demoCall(cmd, jp);
     if (!this.token) await this.login();
     const r = await this._post('/earsiv-services/dispatch', {
       cmd,
