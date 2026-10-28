@@ -276,6 +276,11 @@ async function faturaGonder(onayla) {
       upsert('musteriler', { id: yeniId(), ...f.musteri });
     }
     const g = getGib();
+    const k = await g.kullanici().catch(() => null);
+    const firmaVkn = db().ayar.firma.vkn;
+    if (k && k.vkn && firmaVkn && k.vkn !== firmaVkn) {
+      throw new Error(`GİB hesabı (${k.vkn}${k.ad ? ' – ' + k.ad : ''}) işletme numaranızdan (${firmaVkn}) farklı. Ayarlar'daki kullanıcı kodunu kontrol edin.`);
+    }
     const satir = await g.taslakOlustur(gibFaturaGovdesi(f), new Date(f.tarihObj));
     const t = calcTotals(f.satirlar, f.kdvDahil);
     const kayit = { ...f, ettn: satir.ettn, belgeNumarasi: satir.belgeNumarasi || '', toplam: { matrah: t.matrah, kdv: t.kdv, toplam: t.toplam }, durum: 'taslak', odendi: false, olusturma: new Date().toISOString() };
@@ -647,7 +652,18 @@ rota(/^\/ayarlar$/, () => {
     topla(); kaydet();
     const w = bekle('GİB\'e giriş deneniyor…');
     let g;
-    try { g = getGib(); g.token = null; await g.login(); w.remove(); toast('✅ Bağlantı başarılı'); } catch (e) {
+    try {
+      g = getGib(); g.token = null; await g.login();
+      let k = null;
+      try { k = await g.kullanici(); } catch {}
+      w.remove();
+      const farkli = k && k.vkn && a.firma.vkn && k.vkn !== a.firma.vkn;
+      const m0 = modal(`<h2 style="margin-top:0">✅ Bağlantı başarılı</h2>
+        ${k ? `<p>Giriş yapılan GİB hesabı:<br><b>${esc(k.ad || '—')}</b><br>VKN/TCKN: <b>${esc(k.vkn || '—')}</b></p>` : ''}
+        ${farkli ? `<div class="warn">⚠ Bu hesap, Ayarlar'daki işletme numaranızdan (${esc(a.firma.vkn)}) farklı. Yanlış hesapla girmiş olabilirsiniz. Kullanıcı kodunu kontrol edin.</div>` : ''}
+        <button class="big" id="m0k" style="margin-top:12px">Tamam</button>`);
+      $('#m0k', m0).onclick = () => m0.remove();
+    } catch (e) {
       w.remove();
       const tani = (g && (g.tumTani || g.sonTani)) || '';
       const m = modal(`<h2 style="margin-top:0">⚠ Bağlantı kurulamadı</h2><p>${esc(e.message)}</p>

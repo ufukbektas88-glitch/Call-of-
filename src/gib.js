@@ -21,6 +21,7 @@ const CMD = {
   telefon: ['EARSIV_PORTAL_TELEFONNO_SORGULA', 'RG_SMSONAY'],
   smsGonder: ['EARSIV_PORTAL_SMSSIFRE_GONDER', 'RG_SMSONAY'],
   // GİB imzalama servisini okunabilir addan opak bir kimliğe taşıdı (eski ad "Service Not Found" verir).
+  kullanici: ['EARSIV_PORTAL_KULLANICI_BILGILERI_GETIR', 'RG_KULLANICI'],
   smsDogrula: ['0lhozfib5410mp', 'RG_SMSONAY'],
 };
 
@@ -56,6 +57,7 @@ function demoCall(cmd, jp) {
     demoYaz(d);
     return { data: 'DEMO: Faturanız başarıyla oluşturulmuştur.' };
   }
+  if (cmd === CMD.kullanici[0]) return { data: { vknTckn: '45064396300', unvan: 'DEMO HESAP', ad: 'Demo', soyad: 'Kullanıcı' } };
   if (cmd === CMD.liste[0]) return { data: d.satirlar };
   if (cmd === CMD.telefon[0]) return { data: { telefon: '5XXXXXXXXX' } };
   if (cmd === CMD.smsGonder[0]) return { data: { oid: 'DEMO-OID' } };
@@ -77,7 +79,11 @@ function demoCall(cmd, jp) {
 
 function hataMetni(r) {
   const m = r.messages && r.messages[0];
-  return (typeof m === 'string' ? m : m && m.text) || 'GİB işlemi reddetti.';
+  const metin = (typeof m === 'string' ? m : m && m.text) || 'GİB işlemi reddetti.';
+  if (/e-Ar[şs]iv Portal Fatura.*kesemez/i.test(metin)) {
+    return metin + ' → Giriş yaptığınız GİB hesabı bu numaraya ait. Ayarlar\'daki kullanıcı kodunun SİZİN hesabınıza ait olduğunu kontrol edin (Bağlantıyı dene → hesap adını gösterir). Hesap doğruysa bu mükellef e-Fatura mükellefidir ve e-Arşiv portalından fatura kesemez.';
+  }
+  return metin;
 }
 
 export class Gib {
@@ -158,6 +164,13 @@ export class Gib {
       throw new Error(m);
     }
     return r;
+  }
+
+  // Giriş yapılan GİB hesabının kimliği (VKN/TCKN, ünvan)
+  async kullanici() {
+    const r = await this.cagir(CMD.kullanici, {});
+    const d = r.data || {};
+    return { vkn: String(d.vknTckn || ''), ad: d.unvan || [d.ad, d.soyad].filter(Boolean).join(' ') };
   }
 
   async listele(baslangic, bitis) {
