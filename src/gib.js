@@ -69,13 +69,13 @@ export class Gib {
     this.sonTani = '';
   }
 
-  async _post(path, params) {
+  async _post(path, params, ekBaslik = {}) {
     const url = base(this.mode) + path;
     let res;
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', Accept: 'application/json, text/plain, */*' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', Accept: 'application/json, text/plain, */*', ...ekBaslik },
         body: new URLSearchParams(params).toString(),
       });
     } catch (e) {
@@ -84,6 +84,7 @@ export class Gib {
     }
     const text = typeof res.text === 'function' ? await res.text() : typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
     this.sonTani = `HTTP ${res.status}\n${url}\nkomut: ${params.cmd || params.assoscmd}\n\n${String(text).slice(0, 600)}`;
+    this.tumTani = (this.tumTani || '') + this.sonTani + '\n\n';
     try {
       return JSON.parse(text);
     } catch {
@@ -93,14 +94,63 @@ export class Gib {
 
   async login() {
     if (this.mode === 'test') { this.token = 'DEMO'; return true; }
-    const params = { assoscmd: 'login', userid: this.user, sifre: this.pass, sifre2: this.pass, parola: '1', rtype: 'json' };
-    const r = await this._post('/earsiv-services/assos-login', params);
-    if (!r.token) {
-      const msg = (r.messages && r.messages[0] && r.messages[0].text) || r.error || 'Giriş başarısız. Kullanıcı adı/şifre kontrol edin.';
-      throw new Error(msg);
+    const u = this.user, p = this.pass;
+    const kok = base(this.mode);
+    const sayfaBaslik = { Referer: kok + '/intragiris.html', Origin: kok, 'X-Requested-With': 'XMLHttpRequest' };
+    // GİB giriş biçimi değişmiş olabilir; bilinen biçimleri sırayla dener, ilk token'ı kullanır.
+    const varyantlar = [
+      [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, {}],
+      [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, sayfaBaslik],
+      [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, parola: '1' }, sayfaBaslik],
+      [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, sifre2: p }, sayfaBaslik],
+      [{ assoscmd: 'login', userid: u, sifre: p, sifre2: p, parola: '1' }, sayfaBaslik],
+    ];
+    this.tumTani = '';
+    let ilkHata = '';
+    for (let i = 0; i < varyantlar.length; i++) {
+      const r = await this._post('/earsiv-services/assos-login', varyantlar[i][0], varyantlar[i][1]);
+      if (r.token) {
+        this.token = r.token;
+        this.calisanVaryant = i + 1;
+        return true;
+      }
+      if (!ilkHata) ilkHata = (r.messages && r.messages[0] && r.messages[0].text) || r.error || 'Giriş başarısız. Kullanıcı adı/şifre kontrol edin.';
     }
-    this.token = r.token;
-    return true;
+    throw new Error(ilkHata);
+  }
+
+  // Telefondan GİB giriş sayfasını ve betiklerini okuyup giriş çağrısını gösterir (tanı).
+  async tani() {
+    const kok = base('prod');
+    const cikti = [];
+    const al = async (u) => {
+      const r = await fetch(u, { headers: { Accept: '*/*' } });
+      return typeof r.text === 'function' ? r.text() : String(r.data);
+    };
+    try {
+      const html = await al(kok + '/intragiris.html');
+      cikti.push(`intragiris.html: ${html.length} karakter`);
+      const betikler = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1]);
+      cikti.push('betikler: ' + betikler.join(' , '));
+      const kaynaklar = [['intragiris.html', html]];
+      for (const s of betikler.slice(0, 15)) {
+        try { kaynaklar.push([s, await al(new URL(s, kok + '/intragiris.html').href)]); } catch (e) { cikti.push('okunamadı: ' + s); }
+      }
+      let n = 0;
+      for (const [ad, t] of kaynaklar) {
+        const re = /assos-login|assoscmd/g;
+        let m;
+        let k = 0;
+        while ((m = re.exec(t)) && k < 2 && n < 6) {
+          cikti.push(`--- ${ad} @${m.index}\n` + t.slice(Math.max(0, m.index - 300), m.index + 400).replace(/\s+/g, ' '));
+          k++; n++;
+        }
+      }
+      if (!n) cikti.push('Giriş çağrısı bulunamadı.');
+    } catch (e) {
+      cikti.push('Sayfa okunamadı: ' + (e && e.message));
+    }
+    return cikti.join('\n\n');
   }
 
   async logout() {

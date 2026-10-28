@@ -613,11 +613,21 @@ rota(/^\/ayarlar$/, () => {
     let g;
     try { g = getGib(); g.token = null; await g.login(); w.remove(); toast('✅ Bağlantı başarılı'); } catch (e) {
       w.remove();
-      const tani = (g && g.sonTani) || '';
+      const tani = (g && (g.tumTani || g.sonTani)) || '';
       const m = modal(`<h2 style="margin-top:0">⚠ Bağlantı kurulamadı</h2><p>${esc(e.message)}</p>
         ${tani ? `<label>Teknik ayrıntı (şifre içermez)</label><textarea rows="8" readonly style="font-size:12px">${esc(tani)}</textarea>` : ''}
-        <button class="big" id="tm" style="margin-top:12px">Tamam</button>`);
+        <button class="sec big" id="tt" style="margin-top:12px">🔍 GİB giriş sayfasını incele</button>
+        <button class="big" id="tm" style="margin-top:10px">Tamam</button>`);
       $('#tm', m).onclick = () => m.remove();
+      $('#tt', m).onclick = async () => {
+        $('#tt', m).disabled = true; $('#tt', m).textContent = '⏳ İnceleniyor…';
+        const sonuc = await g.tani();
+        m.remove();
+        const m2 = modal(`<h2 style="margin-top:0">Giriş sayfası incelemesi</h2><textarea id="tsonuc" rows="14" readonly style="font-size:11px">${esc((tani ? tani + '\n\n=====\n\n' : '') + sonuc)}</textarea>
+          <button class="big" id="kop" style="margin-top:12px">📋 Kopyala (bana yapıştırın)</button><button class="ghost" id="kapa" style="width:100%">Kapat</button>`);
+        $('#kapa', m2).onclick = () => m2.remove();
+        $('#kop', m2).onclick = async () => { const t = $('#tsonuc', m2); t.select(); try { await navigator.clipboard.writeText(t.value); toast('Kopyalandı'); } catch { document.execCommand('copy'); toast('Kopyalandı'); } };
+      };
     }
   };
   if ($('#goz')) $('#goz').onclick = () => { const i = $('#gp'); i.type = i.type === 'password' ? 'text' : 'password'; };
