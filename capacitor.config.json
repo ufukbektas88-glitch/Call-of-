@@ -1,0 +1,7 @@
+{
+  "appId": "com.ustafatura.app",
+  "appName": "Usta Fatura",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}
