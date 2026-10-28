@@ -99,6 +99,9 @@ export class Gib {
     const sayfaBaslik = { Referer: kok + '/intragiris.html', Origin: kok, 'X-Requested-With': 'XMLHttpRequest' };
     // GİB giriş biçimi değişmiş olabilir; bilinen biçimleri sırayla dener, ilk token'ı kullanır.
     const varyantlar = [
+      // GİB'in kendi giriş sayfası (intragiris.html) assoscmd olarak "anologin" gönderir.
+      [{ assoscmd: 'anologin', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, sayfaBaslik],
+      [{ assoscmd: 'anologin', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, {}],
       [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, {}],
       [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, sifre2: p, parola: '1' }, sayfaBaslik],
       [{ assoscmd: 'login', rtype: 'json', userid: u, sifre: p, parola: '1' }, sayfaBaslik],
