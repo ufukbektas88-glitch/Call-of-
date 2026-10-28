@@ -40,7 +40,7 @@ function baslikBandi(firma, sag) {
       {
         width: '*',
         stack: [
-          { text: ad, fontSize: 21, bold: true, color: '#ffffff', characterSpacing: 1, margin: [0, 8, 0, 0] },
+          { text: ad, fontSize: ad.length > 18 ? 15 : 21, bold: true, color: '#ffffff', characterSpacing: 1, margin: [0, 8, 0, 0] },
           { text: 'SU TESİSATI · ISITMA · SIHHİ TESİSAT', fontSize: 7.5, color: TURKUAZ, characterSpacing: 1.4, margin: [0, 3, 0, 0] },
         ],
       },
