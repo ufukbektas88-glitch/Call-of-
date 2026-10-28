@@ -584,7 +584,7 @@ rota(/^\/ayarlar$/, () => {
   sayfa('#/daha', `<button class="ghost" onclick="history.back()">← Geri</button><h1>Ayarlar</h1>
     <div class="card"><h2 style="margin-top:0">GİB e-Arşiv Portal</h2>
       <div class="seg"><button data-mode="prod" class="${a.mode === 'prod' ? 'on' : ''}">Gerçek</button><button data-mode="test" class="${a.mode === 'test' ? 'on' : ''}">🧪 Test</button></div>
-      ${a.mode === 'prod' ? `<label>Kullanıcı adı</label><input id="gu" value="${esc(a.user)}" autocomplete="off" /><label>Şifre</label><input id="gp" type="password" value="${esc(a.pass)}" autocomplete="off" />` : '<p class="mut">Test modunda kullanıcı adı gerekmez; faturalar gerçek değildir.</p>'}
+      ${a.mode === 'prod' ? `<label>Kullanıcı adı</label><input id="gu" value="${esc(a.user)}" autocomplete="off" /><label>Şifre</label><div class="row"><input id="gp" type="password" value="${esc(a.pass)}" autocomplete="off" autocapitalize="off" spellcheck="false" /><button class="sec auto" id="goz" type="button">👁</button></div>` : '<p class="mut">Test modunda kullanıcı adı gerekmez; faturalar gerçek değildir.</p>'}
       <p class="mut">Bilgiler yalnızca bu telefonda saklanır, GİB dışında hiçbir yere gönderilmez.</p>
       <button class="sec" id="dene" style="width:100%">🔌 Bağlantıyı dene</button></div>
     <div class="card"><h2 style="margin-top:0">İşletme bilgileriniz (faturada görünür)</h2>
@@ -600,7 +600,7 @@ rota(/^\/ayarlar$/, () => {
     <input type="file" id="dosya" accept=".json" hidden />`);
   $$('[data-mode]').forEach((b) => (b.onclick = () => { topla(); a.mode = b.dataset.mode; kaydet(); yonlendir(); }));
   function topla() {
-    if ($('#gu')) { a.user = $('#gu').value.trim(); a.pass = $('#gp').value; }
+    if ($('#gu')) { a.user = $('#gu').value.trim(); a.pass = $('#gp').value.trim(); }
     $$('[data-fr]').forEach((e) => (fr[e.dataset.fr] = e.value.trim()));
     a.varsayilanKdv = +$('#vk').value;
     a.kdvDahil = $('#vd').checked;
@@ -610,8 +610,17 @@ rota(/^\/ayarlar$/, () => {
   $('#dene').onclick = async () => {
     topla(); kaydet();
     const w = bekle('GİB\'e giriş deneniyor…');
-    try { const g = getGib(); g.token = null; await g.login(); w.remove(); toast('✅ Bağlantı başarılı'); } catch (e) { w.remove(); toast('⚠ ' + e.message, 5000); }
+    let g;
+    try { g = getGib(); g.token = null; await g.login(); w.remove(); toast('✅ Bağlantı başarılı'); } catch (e) {
+      w.remove();
+      const tani = (g && g.sonTani) || '';
+      const m = modal(`<h2 style="margin-top:0">⚠ Bağlantı kurulamadı</h2><p>${esc(e.message)}</p>
+        ${tani ? `<label>Teknik ayrıntı (şifre içermez)</label><textarea rows="8" readonly style="font-size:12px">${esc(tani)}</textarea>` : ''}
+        <button class="big" id="tm" style="margin-top:12px">Tamam</button>`);
+      $('#tm', m).onclick = () => m.remove();
+    }
   };
+  if ($('#goz')) $('#goz').onclick = () => { const i = $('#gp'); i.type = i.type === 'password' ? 'text' : 'password'; };
   $('#yedek').onclick = () => metinPaylas(yedekAl(), `ustafatura-yedek-${isoGun(new Date())}.json`, 'application/json');
   $('#yukle').onclick = () => $('#dosya').click();
   $('#dosya').onchange = async (e) => {

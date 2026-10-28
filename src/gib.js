@@ -29,19 +29,28 @@ export class Gib {
     this.user = user;
     this.pass = pass;
     this.token = null;
+    this.sonTani = '';
   }
 
   async _post(path, params) {
-    const res = await fetch(base(this.mode) + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-      body: new URLSearchParams(params).toString(),
-    });
-    const text = typeof res.text === 'function' ? await res.text() : JSON.stringify(res.data);
+    const url = base(this.mode) + path;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', Accept: 'application/json, text/plain, */*' },
+        body: new URLSearchParams(params).toString(),
+      });
+    } catch (e) {
+      this.sonTani = `AĞ HATASI\n${url}\n${e && e.message ? e.message : e}`;
+      throw new Error('GİB sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.');
+    }
+    const text = typeof res.text === 'function' ? await res.text() : typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+    this.sonTani = `HTTP ${res.status}\n${url}\nkomut: ${params.cmd || params.assoscmd}\n\n${String(text).slice(0, 600)}`;
     try {
       return JSON.parse(text);
     } catch {
-      throw new Error('GİB beklenmeyen yanıt verdi. Biraz sonra tekrar deneyin.');
+      throw new Error(`GİB beklenmeyen yanıt verdi (HTTP ${res.status}). Ayrıntı için "Teknik ayrıntı"ya bakın.`);
     }
   }
 
